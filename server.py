@@ -1,3 +1,6 @@
+import random
+import re
+
 import requests
 from flask import Flask, render_template, jsonify
 
@@ -18,13 +21,35 @@ def get_recipe_for(main_ingredient: str) -> dict:
     # 3. Use `requests` again to fetch the full recipe instructions
     #    - Here is another useful URL: https://www.themealdb.com/api/json/v1/1/lookup.php?i=52772
     # 4. Fill in the details of the returned object in the format below
+
+    recipes = requests.get(f"https://www.themealdb.com/api/json/v1/1/filter.php?i={main_ingredient}")
+    recipes_data = recipes.json()
+
+    random_meal = random.choice(recipes_data["meals"])
+
+    recipe_instructions = requests.get(f"https://www.themealdb.com/api/json/v1/1/lookup.php?i={random_meal["idMeal"]}")
+    recipe_instructions_data = recipe_instructions.json()["meals"][0]
+
+    recipe_ingredients = [(key, value) for (key, value) in recipe_instructions_data.items()
+                          if re.match(r"strIngredient\d+", key)
+                          and value != "" and value is not None]
+
+    recipe_measures = [(key, value) for (key, value) in recipe_instructions_data.items()
+                       if re.match(r"strMeasure\d+", key)
+                       and value != "" and value is not None]
+
+    ingredients_and_measures = [(value1, value2)
+                                for ((key1, value1), (key2, value2))
+                                in zip(recipe_ingredients, recipe_measures)]
+
     return dict(
-        name="",
-        image="",
-        video="",
-        instructions="",
+        name=recipe_instructions_data["strMeal"],
+        image=recipe_instructions_data["strMealThumb"],
+        video=recipe_instructions_data["strYoutube"],
+        instructions=recipe_instructions_data["strInstructions"],
         ingredients=dict(
             # ingredient: measure,
+            ingredients_and_measures
         )
     )
 
@@ -39,6 +64,7 @@ def index():
 
 # YOUR CODE HERE:
 # Make this endpoint get called when for the following routes: "/recipe/<ingredient>"
+@app.route("/recipe/<ingredient>")
 def recipe(ingredient):
     """
     Renders and returns an HTML page with a random recipe for a given main ingredient.
@@ -79,4 +105,5 @@ def recipe(ingredient):
 # Change the "/recipe" endpoints above to search the personal list as well.
 
 if __name__ == '__main__':
+    get_recipe_for("chicken")
     app.run(debug=True)
